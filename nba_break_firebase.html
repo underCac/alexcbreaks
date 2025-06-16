@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NBA Team Picker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+      import {
+        getAuth,
+        onAuthStateChanged,
+        signInWithPopup,
+        GoogleAuthProvider,
+      } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+      import {
+        getFirestore,
+        collection,
+        doc,
+        getDocs,
+        setDoc,
+        onSnapshot
+      } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyAqf4C1GwmxLvj-AmruCbJZ272KBgTH60E",
+        authDomain: "alexcbreaks-a2da8.firebaseapp.com",
+        projectId: "alexcbreaks-a2da8",
+        storageBucket: "alexcbreaks-a2da8.firebasestorage.app",
+        messagingSenderId: "230663498927",
+        appId: "1:230663498927:web:8c0555ef38ea01ed4eb85a"
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth();
+      const db = getFirestore();
+
+      let currentUser = null;
+
+      const loginBtn = document.getElementById("loginBtn");
+      const userInfo = document.getElementById("userInfo");
+      const teamContainer = document.getElementById("teams");
+
+      loginBtn.addEventListener("click", async () => {
+        const provider = new GoogleAuthProvider();
+        await signInWithPopup(auth, provider);
+      });
+
+      onAuthStateChanged(auth, async (user) => {
+        if (user) {
+          currentUser = user;
+          userInfo.textContent = `Logged in as: ${user.displayName}`;
+          loginBtn.classList.add("hidden");
+          loadTeams();
+        }
+      });
+
+      const teams = [
+        "Lakers", "Celtics", "Warriors", "Heat", "Bulls", "Nets", "Knicks", "Spurs", "Rockets", "Clippers",
+        "Mavericks", "Suns", "Jazz", "Thunder", "Nuggets", "Timberwolves", "Pelicans", "Kings", "Grizzlies",
+        "Hornets", "Magic", "Pacers", "Pistons", "Bucks", "76ers", "Raptors", "Cavaliers", "Hawks", "Trail Blazers", "Wizards"
+      ];
+
+      async function loadTeams() {
+        const snapshot = await getDocs(collection(db, "reservations"));
+        const reserved = {};
+        snapshot.forEach((doc) => {
+          reserved[doc.id] = doc.data();
+        });
+
+        teams.forEach((team) => {
+          const btn = document.createElement("button");
+          btn.textContent = team;
+          btn.className =
+            "m-2 p-2 border rounded w-32 " +
+            (reserved[team] ? "bg-gray-400 cursor-not-allowed" : "bg-green-200 hover:bg-green-300");
+          btn.disabled = !!reserved[team];
+
+          btn.onclick = async () => {
+            if (!currentUser) return;
+            await setDoc(doc(db, "reservations", team), {
+              team,
+              uid: currentUser.uid,
+              name: currentUser.displayName,
+              timestamp: new Date().toISOString(),
+            });
+          };
+
+          teamContainer.appendChild(btn);
+        });
+
+        onSnapshot(collection(db, "reservations"), (snap) => {
+          snap.docChanges().forEach((change) => {
+            if (change.type === "added") {
+              const team = change.doc.id;
+              const button = [...teamContainer.children].find((el) => el.textContent === team);
+              if (button) {
+                button.classList = "m-2 p-2 border rounded w-32 bg-gray-400 cursor-not-allowed";
+                button.disabled = true;
+              }
+            }
+          });
+        });
+      }
+    </script>
+  </head>
+  <body class="p-6">
+    <h1 class="text-xl font-bold mb-4">NBA Team Break Picker</h1>
+    <button id="loginBtn" class="mb-4 bg-blue-500 text-white px-4 py-2 rounded">Login with Google</button>
+    <div id="userInfo" class="mb-4 text-sm"></div>
+    <div id="teams" class="flex flex-wrap"></div>
+  </body>
+</html>
